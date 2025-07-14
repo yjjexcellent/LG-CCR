@@ -19,63 +19,6 @@ class QuickGELU(nn.Module):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
 
-class LayerAttentionFusion(nn.Module):
-    """层次注意力机制，用于融合local和global信息"""
-    def __init__(self, d_model: int, codebook_dim: int):
-        super().__init__()
-        self.q_proj = nn.Linear(d_model, d_model)
-        self.k_proj = nn.Linear(codebook_dim, d_model)
-        self.v_proj = nn.Linear(codebook_dim, d_model)
-        self.out_proj = nn.Linear(d_model, d_model)
-        self.scale = d_model ** -0.5
-
-    def forward(self, global_features: torch.Tensor, local_features: list):
-        # global_features: [batch, d_model]
-        # local_features: list of [batch, codebook_dim]
-        local_stack = torch.stack(local_features, dim=1)  # [batch, layers, codebook_dim]
-        
-        Q = self.q_proj(global_features).unsqueeze(1)  # [batch, 1, d_model]
-        K = self.k_proj(local_stack)  # [batch, layers, d_model]
-        V = self.v_proj(local_stack)  # [batch, layers, d_model]
-        
-        attn_scores = torch.matmul(Q, K.transpose(-1, -2)) * self.scale  # [batch, 1, layers]
-        attn_weights = torch.softmax(attn_scores, dim=-1)  # [batch, 1, layers]
-        fused_local = torch.matmul(attn_weights, V).squeeze(1)  # [batch, d_model]
-        
-        return self.out_proj(fused_local)  # [batch, d_model]
-
-# class LayerAttentionFusion(nn.Module):
-#     """层次注意力机制，用于融合全局和最后一层局部信息"""
-#     def __init__(self, d_model: int, codebook_dim: int):
-#         super().__init__()
-#         self.q_proj = nn.Linear(d_model, d_model)  # 查询投影层
-#         self.k_proj = nn.Linear(codebook_dim, d_model)  # 键投影层
-#         self.v_proj = nn.Linear(codebook_dim, d_model)  # 值投影层
-#         self.out_proj = nn.Linear(d_model, d_model)  # 输出投影层
-#         self.scale = d_model ** -0.5  # 缩放因子
-
-#     def forward(self, global_features: torch.Tensor, local_features: torch.Tensor):
-#         """
-#         前向传播函数
-#         :param global_features: 全局特征，形状为 [batch, d_model]
-#         :param local_features: 最后一层局部特征，形状为 [batch, codebook_dim]
-#         :return: 融合后的特征，形状为 [batch, d_model]
-#         """
-#         # 将全局特征和局部特征分别通过查询、键、值投影层
-#         Q = self.q_proj(global_features).unsqueeze(1)  # [batch, 1, d_model]
-#         K = self.k_proj(local_features).unsqueeze(1)   # [batch, 1, d_model]
-#         V = self.v_proj(local_features).unsqueeze(1)   # [batch, 1, d_model]
-
-#         # 计算注意力分数
-#         attn_scores = torch.matmul(Q, K.transpose(-1, -2)) * self.scale  # [batch, 1, 1]
-#         attn_scores = torch.clamp(attn_scores, -1e4, 1e4)  # 防止数值不稳定
-#         attn_weights = torch.softmax(attn_scores, dim=-1)  # [batch, 1, 1]
-
-#         # 对局部特征进行加权求和
-#         fused_local = torch.matmul(attn_weights, V).squeeze(1)  # [batch, d_model]
-
-#         # 通过输出投影层得到最终结果
-#         return self.out_proj(fused_local)  # [batch, d_model]
 
 class ResidualAttentionBlock(nn.Module):
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None, codebook_dim=256):
@@ -565,22 +508,17 @@ class Clip_Codebook(nn.Module):
         #         logits_local_per_image = logit_scale2 * image_local_features @ text_local_features.t()
         #         logits_local_list.append(logits_local_per_image)
 
-        # 将循环外的部分提取出来，避免重复计算
-        # start_layer = max(0, self.layers - 6)  # 确保不会出现负数索引
+
+        # start_layer = max(0, self.layers - 6) 
         start_layer = 0
-        # 对所有相关层一次性进行归一化和计算
         relevant_img_features = img_local_list[start_layer:]
         relevant_txt_features = txt_local_list[start_layer:]
-
-        # 使用torch.stack一次性处理所有层的特征
         img_stack = torch.stack(relevant_img_features)
         txt_stack = torch.stack(relevant_txt_features)
 
-        # 批量归一化
         img_stack = img_stack / img_stack.norm(dim=2, keepdim=True)
         txt_stack = txt_stack / txt_stack.norm(dim=2, keepdim=True)
 
-        # 批量矩阵乘法
         logits_local = logit_scale2 * torch.bmm(img_stack, txt_stack.transpose(1, 2))
 
         logits_local_list.extend(logits_local.unbind(0))
