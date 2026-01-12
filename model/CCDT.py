@@ -51,18 +51,6 @@ class ResidualAttentionBlock(nn.Module):
         self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
 
-    # def attention(self, x: torch.Tensor):
-    #     # 修改前：need_weights=False
-    #     # 修改后：
-    #     if self.attn_mask != None:
-    #         self.attn_mask = self.attn_mask.cuda()
-    #     attn_output, attn_weights = self.attn(
-    #         x, x, x,
-    #         need_weights=True,  # 强制返回权重
-    #         average_attn_weights=False,
-    #         attn_mask=self.attn_mask
-    #     )
-    #     return attn_output  # 保持原有输出格式
 
     def forward(self, inputs):
         x, codebook, local_list, mask, eos = inputs
@@ -379,10 +367,6 @@ class Clip_Codebook(nn.Module):
         )
         self.mix = nn.Linear(1024,512)
         self.mix1 = nn.Linear(1024,512)
-        # self.img_mix = nn.Linear(codebook_dim + vision_output_dim, codebook_dim + vision_output_dim)
-        # self.txt_mix = nn.Linear(codebook_dim + text_embed_dim, codebook_dim + text_embed_dim)
-        # self.img_mix = LayerAttentionFusion(vision_width,codebook_dim)
-        # self.txt_mix = LayerAttentionFusion(text_width,codebook_dim)
         self.min_value = -1e+6
         self.threshold = 0.0
         self.is_threshold = is_threshold
@@ -405,15 +389,6 @@ class Clip_Codebook(nn.Module):
 
     def val_encode_text(self, text):
         text_global_features, txt_local_list = self.encode_text(text, self.codebook)
-        # final_fusion
-        # text_features = self.txt_mix(text_global_features, txt_local_list)
-        # text_features = self.txt_mix(torch.cat((txt_local, text_global), dim=1))
-        # multi_add_final_fusion
-        # text_local_features = torch.mean(torch.stack(txt_local_list), dim=0)
-        # text_features = self.txt_mix(torch.cat((text_local_features, text_global_features), dim=1))
-
-        # return text_global_features, txt_local_list[-1]
-        # print(text_global_features.shape)
         return text_global_features, txt_local_list[-1]
         # return text_global_features, text_local_features, text_features
 
@@ -436,26 +411,6 @@ class Clip_Codebook(nn.Module):
         text_local_features1 = text_local_features / text_local_features.norm(dim=1, keepdim=True)
         logit_scale2 = self.logit_scale2.exp()
         logits_local_per_image = logit_scale2 * image_local_features1 @ text_local_features1.t()
-
-        # fusion
-        # img_local = self.local_norm(image_local_features)
-        # txt_local = self.local_norm(text_local_features)
-        # image_global_features = self.global_norm(image_global_features)
-        # text_global_features = self.global_norm(text_global_features)
-        # img_local = self.q_map(img_local)
-        # txt_local = self.q_map1(txt_local) 
-        # image_mix = self.mix(torch.cat((img_local, image_global_features), dim=1))
-        # text_mix = self.mix1(torch.cat((txt_local, text_global_features), dim=1))
-        # G_i = torch.sigmoid(image_mix)
-        # G_t = torch.sigmoid(text_mix)
-        # img_mf = image_global_features * G_i  + (1 - G_i) * img_local
-        # text_mf = text_global_features * G_t + (1 - G_t) * txt_local
-
-        # img_mf = img_mf / img_mf.norm(dim=1, keepdim=True)
-        # text_mf = text_mf / text_mf.norm(dim=1, keepdim=True)
-        # logit_scale4 = self.logit_scale4.exp()
-        # logits = logit_scale4 * img_mf @ text_mf.t()
-        # print(text_global_features.shape)
         
         image_mix_features = torch.cat((image_global_features, image_local_features), dim=1)
         image_mix_features = (image_mix_features - torch.mean(image_mix_features))/torch.var(image_mix_features)
@@ -483,36 +438,19 @@ class Clip_Codebook(nn.Module):
         image_global_features, img_local_list = self.encode_image(image, self.codebook)
         text_global_features, txt_local_list = self.encode_text(text, self.codebook)
 
-        
-        # image_features = self.img_mix(torch.cat((image_local_features, image_global_features), dim=1))
-        # text_features = self.txt_mix(torch.cat((text_local_features, text_global_features), dim=1))
-        # image_features = image_features / image_features.norm(dim=1, keepdim=True)
-        # text_features = text_features / text_features.norm(dim=1, keepdim=True)
-        # logit_scale3 = self.logit_scale3.exp()
-        # logits_per_image = logit_scale3 * image_features @ text_features.t()
-
         # Global
         image_global_features1 = image_global_features / image_global_features.norm(dim=1, keepdim=True)
         text_global_features1 = text_global_features / text_global_features.norm(dim=1, keepdim=True)
         logit_scale = self.logit_scale.exp()
         logits_global_per_image = logit_scale * image_global_features1 @ text_global_features1.t()
 
-        # Local 每层local都损失的方案
         logit_scale2 = self.logit_scale2.exp()
         logits_local_list = []
-        # for i, image_local_features in enumerate(img_local_list):
-        #     if i > self.layers-3:
-        #         image_local_features = image_local_features / image_local_features.norm(dim=1, keepdim=True)
-        #         text_local_features = txt_local_list[i]
-        #         text_local_features = text_local_features / text_local_features.norm(dim=1, keepdim=True)
-        #         logits_local_per_image = logit_scale2 * image_local_features @ text_local_features.t()
-        #         logits_local_list.append(logits_local_per_image)
 
-
-        # start_layer = max(0, self.layers - 6) 
         start_layer = 0
         relevant_img_features = img_local_list[start_layer:]
         relevant_txt_features = txt_local_list[start_layer:]
+
         img_stack = torch.stack(relevant_img_features)
         txt_stack = torch.stack(relevant_txt_features)
 
@@ -522,12 +460,6 @@ class Clip_Codebook(nn.Module):
         logits_local = logit_scale2 * torch.bmm(img_stack, txt_stack.transpose(1, 2))
 
         logits_local_list.extend(logits_local.unbind(0))
-        # logits_local_list.extend([logits_local[i] for i in range(logits_local.shape[0])])
-
-        
-        # final_fusion
-        # image_features = self.img_mix(image_global_features, img_local_list)
-        # text_features = self.txt_mix(text_global_features, txt_local_list)
         image_mix_features = torch.cat((image_global_features, img_local_list[-1]), dim=1)
         image_mix_features = (image_mix_features - torch.mean(image_mix_features))/torch.var(image_mix_features)
         text_mix_features = torch.cat((text_global_features, txt_local_list[-1]), dim=1)
@@ -539,22 +471,6 @@ class Clip_Codebook(nn.Module):
         logits = logit_scale4 * image_mix_features @ text_mix_features.t()
         return logits_global_per_image, logits_local_list, logits
 
-        # final_fusion
-        # image_features = self.img_mix(torch.cat((img_local_list[-1], image_global_features), dim=1))
-        # text_features = self.txt_mix(torch.cat((txt_local_list[-1], text_global_features), dim=1))
-
-        # multi_add_final_fusion
-        # image_local_features = torch.mean(torch.stack(img_local_list), dim=0)
-        # image_features = self.img_mix(torch.cat((image_local_features, image_global_features), dim=1))
-        # text_local_features = torch.mean(torch.stack(txt_local_list), dim=0)
-        # text_features = self.txt_mix(torch.cat((text_local_features, text_global_features), dim=1))
-        #
-        # image_features = image_features / image_features.norm(dim=1, keepdim=True)
-        # text_features = text_features / text_features.norm(dim=1, keepdim=True)
-        # logit_scale3 = self.logit_scale3.exp()
-        # logits_per_image = logit_scale3 * image_features @ text_features.t()
-
-        # return logits_global_per_image, logits_local_list, logits_per_image
 
 
     

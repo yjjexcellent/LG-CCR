@@ -1,0 +1,30 @@
+import os
+
+config = {
+    'epoch': 100,
+    'train_dataset': '',
+    'val_dataset': '',
+    'batch_size': 12000,
+    'char_dict': './char_dict',
+    'alphabet_path': './data/IDS/radical_alphabet_3755.txt',
+    'decompose_path': './data/IDS/decompose_3755.txt',
+    'lr': 1e-4,
+    'train_class': 1500,
+    'val_class': 1000,
+    'vision_input_resolution': 128,
+    'vision_patch_size': 16,
+    'vision_width': 512,
+    'vision_layers': 12,
+    'vision_heads': 8,
+    'vision_output_dim': 512,
+    'text_embed_dim': 512,
+    'max_len': 30,
+    'text_width': 512,
+    'text_heads': 8,
+    'text_layers': 12,
+    'codebook_num': 200,
+    'codebook_dim': 256,
+    'temperature': 1,
+    'is_threshold': False,
+    'save_root': ''
+}
