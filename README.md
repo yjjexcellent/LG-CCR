@@ -1,6 +1,6 @@
 # LG-CCR: Cross-Modal Local and Global Alignment for Chinese Character Recognition
 
-Official implementation of the paper **"LG-CCR: Language-Guided Contrastive Contextual Representation for Scene Text Recognition"**.
+Official implementation of the paper **"LG-CCR: Cross-Modal Local and Global Alignment for Chinese Character Recognition"**.
 
 ---
 
@@ -22,7 +22,13 @@ conda activate lgccr
 # install dependencies
 pip install -r requirements.txt
 
+```
+
+---
+
 ## 📂 Project Structure
+
+```text
 LG-CCR/
 ├── cfgs/                # Configuration files (.yaml / .py)
 ├── models/              # Model architecture of LG-CCR
@@ -30,16 +36,27 @@ LG-CCR/
 ├── pretrain_main_CCDT.py # Main script for pre-training
 └── requirements.txt     # List of dependencies
 
-##🚀 Training
-1. Data Preparation
+```
 
-Please organize your datasets in the data/ directory and ensure the paths in your config files are correctly set.
+---
 
-2. Configuration
+## 🚀 Training & Evaluation
 
-Before starting the training process, remember to adjust the corresponding parameters in the configuration files located in cfgs/
+### 1. Data Preparation
 
-3.Run Training
+Please organize your datasets in the `data/` directory and ensure the paths in your config files are correctly set.
+
+### 2. Configuration
+
+Before starting the training process, remember to adjust the corresponding parameters in the configuration files located in `cfgs/`:
+
+
+### 3. Run Training
 
 Execute the following command to start the pre-training:
-python pretrain_main_CCDT.py --cfg cfgs/pretrain_config.py
+
+```bash
+python pretrain_main_CCDT.py 
+
+```
+
